@@ -226,9 +226,6 @@ def start_instance(aws_key, aws_secret, zone, instance_type, roles, environment=
         raid_code = raid_code,
     )
     
-    print userdata
-    sys.exit(0)
-
     if groups is None:
         groups = ["default"]
 
@@ -265,7 +262,7 @@ def start_instance(aws_key, aws_secret, zone, instance_type, roles, environment=
         instance.add_tag("Name", forcename)
     elif basename:
         for i in range(1, 1000):
-            hostname = "%s%d" % (basename, i)
+            hostname = "%s%02d" % (basename, i)
             if hostname not in host_names:
                 instance.add_tag("Name", hostname)
                 break
