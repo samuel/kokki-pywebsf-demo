@@ -95,13 +95,14 @@ RAID = dedent("""
     fi
 """).strip()+"\n"
 
-def build_userdata(project_url, config_path, roles, raid_code, private_key):
+def build_userdata(project_url, config_path, roles, raid_code, private_key, kokki_args=None):
     context = dict(
         private_key = private_key,
         project_url = project_url,
         config_path = config_path,
         roles = " ".join(roles),
         raid_code = raid_code,
+        kokki_args = kokki_args or "",
     )
     userdata = [dedent("""
         #!/bin/sh
@@ -165,11 +166,12 @@ def build_userdata(project_url, config_path, roles, raid_code, private_key):
         cd ..
         unset GIT_SSH
         export GIT_SSH
-        python -m kokki.command -f private/{config_path} \$@ {roles}
+        python -m kokki.command -f private/{config_path} {kokki_args} \$@ {roles}
         EOF
 
         chmod +x update.sh
         ./update.sh 1> /var/log/kokki.log 2> /var/log/kokki.log
+        echo FIN >> /var/log/kokki.log
         """.format(**context)).strip()+"\n")
     
     return "\n".join(userdata)
@@ -202,7 +204,7 @@ def read_config(path):
 
     return config
 
-def start_instance(aws_key, aws_secret, zone, instance_type, roles, environment=None, basename=None, forcename=None, wait=True, root_type="local", tags=None, word_size=None, raid=False, ami_id=None, base=None, key_name=None, groups=None, private_key=None, config_path="config", project_url=None, min_count=1, max_count=1):
+def start_instance(aws_key, aws_secret, zone, instance_type, roles, environment=None, basename=None, forcename=None, wait=True, root_type="local", tags=None, word_size=None, raid=False, ami_id=None, base=None, key_name=None, groups=None, private_key=None, config_path="config", project_url=None, min_count=1, max_count=1, kokki_args=None):
     word_size = word_size or INSTANCE_TYPES[instance_type]
     if instance_type == "t1.micro":
         root_type = "ebs"
@@ -218,14 +220,6 @@ def start_instance(aws_key, aws_secret, zone, instance_type, roles, environment=
     else:
         raid_code = ""
 
-    userdata = build_userdata(
-        private_key = private_key,
-        project_url = project_url,
-        config_path = config_path,
-        roles = roles,
-        raid_code = raid_code,
-    )
-    
     if groups is None:
         groups = ["default"]
 
@@ -244,6 +238,24 @@ def start_instance(aws_key, aws_secret, zone, instance_type, roles, environment=
                 if name:
                     host_names.add(name)
 
+    if forcename:
+        instancename = forcename
+    elif basename:
+        for i in range(1, 1000):
+            hostname = "%s%02d" % (basename, i)
+            if hostname not in host_names:
+                instancename = hostname
+                break
+    
+    userdata = build_userdata(
+        private_key = private_key,
+        project_url = project_url,
+        config_path = config_path,
+        roles = roles,
+        raid_code = raid_code,
+        kokki_args = kokki_args,
+    )
+    
     image = ec2.get_image(ami_id)
     res = image.run(
         min_count = min_count,
@@ -258,14 +270,7 @@ def start_instance(aws_key, aws_secret, zone, instance_type, roles, environment=
 
     time.sleep(1)
 
-    if forcename:
-        instance.add_tag("Name", forcename)
-    elif basename:
-        for i in range(1, 1000):
-            hostname = "%s%02d" % (basename, i)
-            if hostname not in host_names:
-                instance.add_tag("Name", hostname)
-                break
+    instance.add_tag("Name", instancename)
 
     if tags:
         for name, value in tags.items():
@@ -283,6 +288,8 @@ def start_instance(aws_key, aws_secret, zone, instance_type, roles, environment=
     return dict(
         public_dns = instance.public_dns_name,
         private_dns = instance.private_dns_name,
+        private_ip = instance.private_ip_address,
+        name = instancename,
     )
 
 def main():
