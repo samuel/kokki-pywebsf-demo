@@ -1,10 +1,10 @@
 
 import os.path
 
-cookbook_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "cookbooks")
+COOKBOOK_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "cookbooks")
 
 def base(kit):
-    kit.add_cookbook_path(cookbook_path, "kokki.cookbooks")
+    kit.add_cookbook_path(COOKBOOK_PATH, "kokki.cookbooks")
     kit.update_config({
         "users": {
             "samuel": dict(
