@@ -283,7 +283,6 @@ def start_instance(aws_key, aws_secret, zone, instance_type, roles, environment=
     return dict(
         public_dns = instance.public_dns_name,
         private_dns = instance.private_dns_name,
-        private_ip = instance.private_ip, #domU-12-31-39-0C-1A-6A.compute-1.internal,
     )
 
 def main():
